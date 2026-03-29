@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "openenv-traffic-control"
+version = "1.0.0"
+description = "Autonomous Traffic Control RL Environment – OpenEnv Hackathon"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    # Core OpenEnv runtime (provides FastAPI server + HTTP client types + WebSocket)
+    "openenv-core[core]>=0.2.2",
+    # Standard numeric
+    "numpy>=1.24.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "httpx>=0.25.0",
+    "pytest-asyncio>=0.23.0",
+]
+
+[project.scripts]
+# Run the server: uv run --project . server
+server = "traffic_control_env.server.app:main"
+
+[tool.setuptools]
+include-package-data = true
+packages = ["traffic_control_env", "traffic_control_env.server"]
+package-dir = { "traffic_control_env" = ".", "traffic_control_env.server" = "server" }
