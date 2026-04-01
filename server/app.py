@@ -102,6 +102,54 @@ async def grade(request: Request):
     }
 
 
+# ---------------------------------------------------------------------------
+# 3. Add Gradio UI Testing Interface mounted at /ui
+# ---------------------------------------------------------------------------
+import gradio as gr
+import requests
+
+def reset_env(task_id):
+    try:
+        resp = requests.post("http://127.0.0.1:8000/reset", json={"task_id": task_id, "seed": 42})
+        return resp.json() if resp.status_code == 200 else {"error": resp.text}
+    except Exception as e:
+        return {"error": str(e)}
+
+def step_env(phase):
+    try:
+        resp = requests.post("http://127.0.0.1:8000/step", json={"light_phase": int(phase)})
+        return resp.json() if resp.status_code == 200 else {"error": resp.text}
+    except Exception as e:
+        return {"error": str(e)}
+
+def get_state():
+    try:
+        resp = requests.get("http://127.0.0.1:8000/state")
+        return resp.json() if resp.status_code == 200 else {"error": resp.text}
+    except Exception as e:
+        return {"error": str(e)}
+
+with gr.Blocks(title="Traffic Control UI", theme=gr.themes.Soft()) as ui:
+    gr.Markdown("# 🚦 Autonomous Traffic Control - Testing UI")
+    gr.Markdown("Use this interface to manually test the OpenEnv HTTP API endpoints.")
+    with gr.Row():
+        task_dropdown = gr.Dropdown(choices=["basic_flow", "emergency_priority", "dynamic_scenarios"], value="basic_flow", label="Task ID")
+        reset_btn = gr.Button("🔄 Reset Environment")
+        state_btn = gr.Button("📊 Get State")
+        
+    with gr.Row():
+        phase_radio = gr.Radio(choices=[("0 - NS Green", "0"), ("1 - EW Green", "1"), ("2 - All Red", "2")], value="0", label="Next Action (Light Phase)")
+        step_btn = gr.Button("▶️ Step Action", variant="primary")
+        
+    output_json = gr.JSON(label="API Response")
+    
+    reset_btn.click(reset_env, inputs=[task_dropdown], outputs=[output_json])
+    step_btn.click(step_env, inputs=[phase_radio], outputs=[output_json])
+    state_btn.click(get_state, outputs=[output_json])
+
+app = gr.mount_gradio_app(app, ui, path="/ui")
+
+
 def main(host: str = "0.0.0.0", port: int = 8000) -> None:
     """
     Entry point for direct execution.
