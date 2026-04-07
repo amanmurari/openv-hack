@@ -54,14 +54,16 @@ app = create_app(
 #    for hackathon evaluation of task scores)
 # ---------------------------------------------------------------------------
 
-@app.post("/grade", tags=["eval"])
-async def grade(request: Request):
+@app.post("/grade/{session_id}", tags=["eval"])
+@app.post("/grade", tags=["eval"])  # KEEP fallback for backwards-compatibility
+async def grade(request: Request, session_id: str = None):
     """
     Run the automated grader for the environment's *current* state and return
     a 0-1 normalised score along with detailed metrics and feedback.
 
     The request body may optionally contain {"task_id": "..."} to override
     auto-detection; otherwise the grader reads task_id from the env state.
+
 
     Note: For WebSocket sessions the client calls this via HTTP after the
     episode ends.  The endpoint reads state from the single shared environment
