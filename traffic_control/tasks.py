@@ -2,30 +2,25 @@
 Task graders for the Autonomous Traffic Control OpenEnv environment.
 
 Defines three tasks of increasing difficulty:
-  1. basic_flow          – high-volume baseline throughput optimisation
-  2. emergency_priority  – emergency vehicle management + throughput
-  3. dynamic_scenarios   – surge-traffic + emergencies under hard constraints
+  1. basic_flow          – baseline throughput optimisation (Easy)
+  2. emergency_priority  – emergency vehicle management + throughput (Medium)
+  3. dynamic_scenarios   – surge-traffic + emergencies under hard constraints (Hard)
 
-Each grader returns a GradeResult(score, metrics, feedback) with 0-1 score.
+Each grader returns a GradeResult(score, metrics, feedback) with 0–1 score.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 
 @dataclass
 class GradeResult:
     """Standardised grading result."""
-    score:    float             # strictly in (0.001, 0.999)
-    metrics:  Dict[str, Any]   = field(default_factory=dict)
-    feedback: str              = ""
-
-
-def _clamp(score: float) -> float:
-    """Ensure score is strictly between 0 and 1 (never 0.0 or 1.0 exactly)."""
-    return round(max(0.001, min(0.999, score)), 4)
+    score: float                        # 0.0 – 1.0
+    metrics: Dict[str, Any] = field(default_factory=dict)
+    feedback: str = ""
 
 
 # ---------------------------------------------------------------------------
@@ -45,15 +40,14 @@ def grade(
 ) -> GradeResult:
     """Route to the appropriate task grader."""
     graders = {
-        "basic_flow":          _grade_basic_flow,
-        "emergency_priority":  _grade_emergency_priority,
-        "dynamic_scenarios":   _grade_dynamic_scenarios,
+        "basic_flow":         _grade_basic_flow,
+        "emergency_priority": _grade_emergency_priority,
+        "dynamic_scenarios":  _grade_dynamic_scenarios,
     }
     if task_id not in graders:
         return GradeResult(
-            score=0.001,
-            feedback=f"Unknown task_id '{task_id}'. "
-                     f"Valid tasks: {list(graders.keys())}",
+            score=0.0,
+            feedback=f"Unknown task_id '{task_id}'. Valid: {list(graders.keys())}",
         )
     return graders[task_id](
         total_vehicles_passed=total_vehicles_passed,
@@ -67,10 +61,11 @@ def grade(
 
 
 # ---------------------------------------------------------------------------
-# Task 1 – Basic Flow  (weight in overall hackathon score: 30%)
+# Task 1 – Basic Flow  (Easy)
 # ---------------------------------------------------------------------------
 
 _BASIC_FLOW_TARGET_THROUGHPUT_PER_STEP = 1.8  # vehicles/step considered "perfect"
+
 
 def _grade_basic_flow(
     *,
@@ -89,13 +84,13 @@ def _grade_basic_flow(
     score = max(0.0, raw - collision_penalty)
 
     return GradeResult(
-        score=_clamp(raw - collision_penalty),
+        score=round(score, 4),
         metrics={
-            "throughput_per_step":  round(throughput_per_step, 3),
-            "throughput_score":     round(throughput_score,    4),
-            "efficiency_score":     round(efficiency_score,    4),
-            "total_collisions":     total_collisions,
-            "collision_penalty":    collision_penalty,
+            "throughput_per_step": round(throughput_per_step, 3),
+            "throughput_score":    round(throughput_score,    4),
+            "efficiency_score":    round(efficiency_score,    4),
+            "total_collisions":    total_collisions,
+            "collision_penalty":   collision_penalty,
         },
         feedback=(
             f"Throughput {throughput_per_step:.2f} veh/step "
@@ -106,10 +101,11 @@ def _grade_basic_flow(
 
 
 # ---------------------------------------------------------------------------
-# Task 2 – Emergency Priority  (weight: 40%)
+# Task 2 – Emergency Priority  (Medium)
 # ---------------------------------------------------------------------------
 
 _EMERG_TARGET_DELAY_PER_VEHICLE = 3.0  # steps/emergency vehicle
+
 
 def _grade_emergency_priority(
     *,
@@ -124,22 +120,22 @@ def _grade_emergency_priority(
     throughput_per_step = total_vehicles_passed / step_count
     throughput_score    = min(throughput_per_step / 1.5, 1.0)
 
-    # Emergency throughput (score = 1 if ≥ 1 emergency vehicle cleared per 20 steps)
+    # Emergency throughput score: 1.0 if ≥ 1 emergency vehicle cleared per 20 steps
     em_rate       = total_emergency_passed / step_count
     em_rate_score = min(em_rate / (1.0 / 20.0), 1.0)
 
     # Emergency delay score
     if total_emergency_passed > 0:
-        avg_delay     = total_emergency_delay / total_emergency_passed
-        delay_score   = max(0.0, 1.0 - avg_delay / (_EMERG_TARGET_DELAY_PER_VEHICLE * 4))
+        avg_delay   = total_emergency_delay / total_emergency_passed
+        delay_score = max(0.0, 1.0 - avg_delay / (_EMERG_TARGET_DELAY_PER_VEHICLE * 4))
     else:
-        delay_score   = 0.5
+        delay_score = 0.5
 
     efficiency_score  = 1.0 / (1.0 + total_waiting_time / max(step_count, 1) * 0.05)
     collision_penalty = 0.85 if total_collisions > 0 else 0.0
 
     raw   = (throughput_score * 0.30 + em_rate_score * 0.35 +
-             delay_score * 0.20    + efficiency_score * 0.15)
+             delay_score      * 0.20 + efficiency_score * 0.15)
     score = max(0.0, raw - collision_penalty)
 
     avg_delay_str = (
@@ -148,7 +144,7 @@ def _grade_emergency_priority(
     )
 
     return GradeResult(
-        score=_clamp(raw - collision_penalty),
+        score=round(score, 4),
         metrics={
             "throughput_per_step":       round(throughput_per_step, 3),
             "throughput_score":          round(throughput_score,    4),
@@ -169,7 +165,7 @@ def _grade_emergency_priority(
 
 
 # ---------------------------------------------------------------------------
-# Task 3 – Dynamic Scenarios  (weight: 30%)
+# Task 3 – Dynamic Scenarios  (Hard)
 # ---------------------------------------------------------------------------
 
 def _grade_dynamic_scenarios(
@@ -195,26 +191,26 @@ def _grade_dynamic_scenarios(
     else:
         delay_score = 0.0
 
-    efficiency_score  = 1.0 / (1.0 + total_waiting_time / max(step_count, 1) * 0.08)
+    efficiency_score   = 1.0 / (1.0 + total_waiting_time / max(step_count, 1) * 0.08)
     adaptability_score = 1.0 / (1.0 + total_phase_changes / max(step_count, 1) * 0.5)
     collision_penalty  = 0.9 if total_collisions > 0 else 0.0
 
-    raw   = (throughput_score    * 0.25 + em_rate_score  * 0.30 +
+    raw   = (throughput_score    * 0.25 + em_rate_score   * 0.30 +
              delay_score         * 0.20 + efficiency_score * 0.15 +
              adaptability_score  * 0.10)
     score = max(0.0, raw - collision_penalty)
 
     return GradeResult(
-        score=_clamp(raw - collision_penalty),
+        score=round(score, 4),
         metrics={
-            "throughput_per_step":    round(throughput_per_step, 3),
-            "throughput_score":       round(throughput_score,    4),
-            "emergency_rate_score":   round(em_rate_score,       4),
-            "emergency_delay_score":  round(delay_score,         4),
-            "efficiency_score":       round(efficiency_score,    4),
-            "adaptability_score":     round(adaptability_score,  4),
-            "total_collisions":       total_collisions,
-            "total_phase_changes":    total_phase_changes,
+            "throughput_per_step":   round(throughput_per_step, 3),
+            "throughput_score":      round(throughput_score,    4),
+            "emergency_rate_score":  round(em_rate_score,       4),
+            "emergency_delay_score": round(delay_score,         4),
+            "efficiency_score":      round(efficiency_score,    4),
+            "adaptability_score":    round(adaptability_score,  4),
+            "total_collisions":      total_collisions,
+            "total_phase_changes":   total_phase_changes,
         },
         feedback=(
             f"Dynamic task: throughput {throughput_per_step:.2f} veh/step, "
